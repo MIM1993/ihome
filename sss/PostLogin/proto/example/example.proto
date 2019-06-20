@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package go.micro.srv.PostLogin;
+
+service Example {
+    rpc PostLogin (Request) returns (Response) {
+    }
+}
+
+message Request {
+    //用户名
+    string mobile = 1;
+    //密码
+    string password = 2;
+}
+
+message Response {
+    //错误码
+    string errno = 1;
+    //错误信息
+    string errmsg = 2;
+    //sessionid
+    string sessionid = 3;
+}
