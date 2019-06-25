@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package go.micro.srv.PutOrders;
+
+service Example {
+    rpc PutOrders (Request) returns (Response) {
+    }
+}
+
+//web-->srv
+message Request {
+    //sessionid
+    string sessionid = 1;
+    //action
+    string action = 2;
+    //订单号
+    string orderid = 3;
+}
+
+//srv-->web
+message Response {
+    //错误码
+    string errno = 1;
+    //错误信息
+    string errmsg = 2;
+}

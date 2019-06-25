@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package go.micro.srv.PutComment;
+
+service Example {
+    rpc PutComment (Request) returns (Response) {
+    }
+}
+
+//web -- > srv
+message Request {
+    //sessionid
+    string sessionid = 1;
+    //订单id
+    string order_id = 2;
+    //评论
+    string comment = 3;
+}
+
+//srv -- web
+message Response {
+    //错误码
+    string errno = 1;
+    //错误信息
+    string errmsg = 2;
+
+}
+
+

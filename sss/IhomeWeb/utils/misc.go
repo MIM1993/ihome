@@ -47,10 +47,10 @@ func Getmd5string(s string) string {
 }
 
 //fastdfs上传函数 参数:(二进制 文件,后缀名); 返回值:(fileid,err)
-func Uploadbybuf(file []byte, Extname string) (filed string, err error) {
+func Uploadbybuf(file []byte, Extname string) (fileid string, err error) {
 	//读取配置文件 创建fastdfs客户端句柄
 	//fdfsclient, err := fdfs_client.NewFdfsClient("/etc/fdfs/client.conf ")
-	fdfsclient, err := fdfs_client.NewFdfsClient("./conf/client.conf")
+	fdfsclient, err := fdfs_client.NewFdfsClient("/home/itcast/workspace/go/src/sss/IhomeWeb/conf/client.conf")
 
 	if err != nil {
 		return "", err

@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package go.micro.srv.PostHouses;
+
+service Example {
+    rpc PostHouses (Request) returns (Response) {
+    }
+}
+
+//web-->srv
+message Request {
+    //sessionid
+    string sessionid = 1;
+    //从前段接收到的数据
+    bytes data = 2;
+}
+
+//srv--web
+message Response {
+    //错误码
+    string errno = 1;
+    //错误信息
+    string errmsg = 2;
+    //返回的房屋id
+    int64 house_id = 3;
+}
+

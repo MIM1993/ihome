@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package go.micro.srv.PostOrders;
+
+service Example {
+	rpc PostOrders(Request) returns (Response) {}
+}
+
+
+//web --> srv
+message Request {
+	//sessionid
+	string sessionid = 1;
+	//房屋ID
+	bytes body = 2;
+}
+
+//srv -- web
+message Response {
+	//错误码
+	string errno = 1;
+	//错误信息
+	string errmsg = 2;
+	//订单id
+	int64 order_id = 3;
+}

@@ -32,7 +32,6 @@ func main() {
 	//获取地区信息
 	rou.GET("/api/v1.0/areas", handler.GetArea)
 
-
 	//获取图片验证吗服务
 	rou.GET("/api/v1.0/imagecode/:uuid", handler.GetImageCd)
 
@@ -61,14 +60,41 @@ func main() {
 	rou.POST("/api/v1.0/user/auth", handler.PostUserAuth)
 
 	//上传用户头像
-	rou.POST("/api/v1.0/user/avatar",handler.PostAvatar)
+	rou.POST("/api/v1.0/user/avatar", handler.PostAvatar)
 
 	//更新用户名
-	rou.PUT("/api/v1.0/user/name",handler.PutUserInfo)
+	rou.PUT("/api/v1.0/user/name", handler.PutUserInfo)
 
-	//首页
-	rou.GET("/api/v1.0/house/index", handler.Getindex)
+	//获取用户已发布房源信息服务
+	rou.GET("/api/v1.0/user/houses", handler.GetUserHouses)
 
+	//发送（发布）房源信息服务
+	rou.POST("/api/v1.0/houses", handler.PostHouses)
+
+	//发送（上传）房屋图片服务
+	rou.POST("/api/v1.0/houses/:id/images", handler.PostHousesImage)
+
+	//获取房屋详细信息服务
+	rou.GET("/api/v1.0/houses/:id", handler.GetHouseInfo)
+
+	//获取首页轮播图片服务
+	rou.GET("/api/v1.0/house/index", handler.GetIndex)
+
+	//------------------------------------------------------------------
+	//获取（搜索）房源服务
+	rou.GET("/api/v1.0/houses", handler.GetHouses)
+
+	//发送（发布）订单服务
+	rou.POST("/api/v1.0/orders", handler.PostOrders)
+
+	//获取房东/租户订单信息服务
+	rou.GET("/api/v1.0/user/orders", handler.GetUserOrder)
+
+	//更新房东同意/拒绝订单
+	rou.PUT("/api/v1.0/orders/:id/status", handler.PutOrders)
+
+	//更新用户评价订单信息
+	rou.PUT("/api/v1.0/orders/:id/comment", handler.PutComment)
 
 	//将router 注册到访服务
 	service.Handle("/", rou)

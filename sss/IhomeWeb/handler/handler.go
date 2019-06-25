@@ -15,6 +15,16 @@ import (
 	POSTAVATAR "sss/PostAvatar/proto/example"
 	PUTUSERINFO "sss/PutUserInfo/proto/example"
 	POSTUSERAUTH "sss/PostUserAuth/proto/example"
+	GETUSERHOUSES "sss/GetUserHouses/proto/example"
+	POSTHOUSES "sss/PostHouses/proto/example"
+	POSTHOUSESIMAGE "sss/PostHousesImage/proto/example"
+	GETHOUSEINFO "sss/GetHouseInfo/proto/example"
+	GETINDEX "sss/GetIndex/proto/example"
+	GETHOUSES "sss/GetHouses/proto/example"
+	POSTORDERS "sss/PostOrders/proto/example"
+	GETUSERORDERS "sss/GetUserOrder/proto/example"
+	PUTORDERS "sss/PutOrders/proto/example"
+	PUTCOMMENT "sss/PutComment/proto/example"
 	"github.com/julienschmidt/httprouter"
 	"github.com/micro/go-grpc"
 	"github.com/astaxie/beego"
@@ -24,6 +34,7 @@ import (
 	"github.com/afocus/captcha"
 	"image/png"
 	"sss/IhomeWeb/utils"
+	"io/ioutil"
 )
 
 //damo
@@ -45,6 +56,7 @@ func ExampleCall(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	//rsp, err := exampleClient.Call(context.TODO(), &example.Request{
 	//	Name: request["name"].(string),
 	//})
+	//判断错误
 	//if err != nil {
 	//	http.Error(w, err.Error(), 500)
 	//	return
@@ -112,13 +124,53 @@ func GetArea(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	return
 }
 
-//欺骗浏览器  首页登录
-func Getindex(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	fmt.Println("Getindex /api/v1.0/house/index")
+//获取首页轮播  首页登录
+func GetIndex(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	fmt.Println("获取首页轮播 GetIndex /api/v1.0/house/index")
+
+	//创建grpc
+	cil := grpc.NewService()
+	//初始化
+	cil.Init()
+
+	//创建句柄，调用函数
+	exampleClient := GETINDEX.NewExampleService("go.micro.srv.GetIndex", cil.Client())
+	rsp, err := exampleClient.GetIndex(context.TODO(), &GETINDEX.Request{})
+	if err != nil {
+		http.Error(w, err.Error(), 502)
+		return
+	}
+
+	//创建接受数据容器
+	index := []interface{}{}
+
+	//将数据解码到data容器中
+	if err := json.Unmarshal(rsp.Data, &index); err != nil {
+		fmt.Println("解码数据错误")
+		// we want to augment the response
+		response := map[string]interface{}{
+			"errno":  utils.RECODE_DATAERR,
+			"errmsg": utils.RecodeText(utils.RECODE_DATAERR),
+		}
+		//设置返回数据的格式
+		w.Header().Set("Content-type", "application/json")
+		// encode and write the response as json
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		return
+	}
+
+	//创建返回前端的数据容器
+	//data := make(map[string]interface{})
+	//data["houses"] = index
+
 	// we want to augment the response
 	response := map[string]interface{}{
-		"errno":  "0",
-		"errmsg": "ok",
+		"errno":  rsp.Errno,
+		"errmsg": rsp.Errmsg,
+		"data":   index,
 	}
 
 	//设置返回数据的格式
@@ -126,9 +178,10 @@ func Getindex(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 	// encode and write the response as json
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), 503)
 		return
 	}
+	return
 }
 
 //登录检查session
@@ -967,4 +1020,764 @@ func PostUserAuth(w http.ResponseWriter, r *http.Request, ps httprouter.Params) 
 	}
 	return
 
+}
+
+//获取用户已发布房源信息服务
+func GetUserHouses(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	fmt.Println("获取用户已发布房源信息服务 api/v1.0/user/houses  GetUserHouses")
+
+	//创建grpc链接 客户端
+	cli := grpc.NewService()
+	//初始化
+	cli.Init()
+
+	//获取cookie从中取出sessionid
+	cookie, err := r.Cookie("ihomelogin")
+	if err != nil {
+		fmt.Println("Cookie获取错误")
+		// we want to augment the response
+		response := map[string]interface{}{
+			"errno":  utils.RECODE_SESSIONERR,
+			"errmsg": utils.RecodeText(utils.RECODE_SESSIONERR),
+		}
+		//设置返回数据的格式
+		w.Header().Set("Content-type", "application/json")
+		// encode and write the response as json
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		return
+	}
+
+	// 通过句柄调用函数，得到返回值
+	exampleClient := GETUSERHOUSES.NewExampleService("go.micro.srv.GetUserHouses", cli.Client())
+	rsp, err := exampleClient.GetUserHouses(context.TODO(), &GETUSERHOUSES.Request{
+		Sessionid: cookie.Value,
+	})
+	//判断错误信息
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	/*定义容器返回返房屋信息*/
+	//房屋切片
+	house_list := []models.House{}
+
+	//json解码，将返回的数据加载进 房屋切片
+	if err := json.Unmarshal(rsp.Data, &house_list); err != nil {
+		fmt.Println("返回数据解码错误, err:", err)
+		// we want to augment the response
+		response := map[string]interface{}{
+			"errno":  utils.RECODE_DATAERR,
+			"errmsg": utils.RecodeText(utils.RECODE_DATAERR),
+		}
+		//设置返回数据的格式
+		w.Header().Set("Content-type", "application/json")
+		// encode and write the response as json
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		return
+	}
+
+	//json.Unmarshal(rsp.Data, &house_list)
+
+	//定义返回给前段的数据容器 ===>切片
+	var houses []interface{}
+
+	//遍历house_list，取出数据，将数据装进houses切片中，切片中是一个个map[string]interface{}
+	for _, value := range house_list {
+		fmt.Printf("house.user = %+v\n", value.Id)
+		fmt.Printf("house.area = %+v\n", value.Area)
+		houses = append(houses, value.To_house_info())
+	}
+
+	fmt.Println("houses:", houses)
+
+	//返回的数据Data也是个map，key=“houses”  value=houses（切片[]interface{}）
+	data_map := make(map[string]interface{})
+	data_map["houses"] = houses
+
+	// 准备返回结构体
+	response := map[string]interface{}{
+		"errno":  rsp.Errno,
+		"errmsg": rsp.Errmsg,
+		"data":   data_map,
+	}
+
+	//设置返回数据的格式
+	w.Header().Set("Content-type", "application/json")
+	// encode and write the response as json
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	return
+}
+
+//发送（发布）房源信息服务
+func PostHouses(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	fmt.Println("发送（发布）房源信息服务 PostHouses   /api/v1.0/houses")
+
+	//不接受数据，直接将数据存放在二进制数据容器中,获取post请求包体中的数据
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		fmt.Println("获取数据失败")
+		// we want to augment the response
+		response := map[string]interface{}{
+			"errno":  utils.RECODE_DATAERR,
+			"errmsg": utils.RecodeText(utils.RECODE_DATAERR),
+		}
+
+		//设置返回数据的格式
+		w.Header().Set("Content-type", "application/json")
+		// encode and write the response as json
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		return
+	}
+
+	//获取sessionid
+	cookie, err := r.Cookie("ihomelogin")
+	if err != nil {
+		fmt.Println("session获取失败")
+		// we want to augment the response
+		response := map[string]interface{}{
+			"errno":  utils.RECODE_SESSIONERR,
+			"errmsg": utils.RecodeText(utils.RECODE_SESSIONERR),
+		}
+
+		//设置返回数据的格式
+		w.Header().Set("Content-type", "application/json")
+		// encode and write the response as json
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		return
+	}
+
+	//创建grpc链接 客户端
+	cli := grpc.NewService()
+	//初始化
+	cli.Init()
+
+	// call the backend service
+	exampleClient := POSTHOUSES.NewExampleService("go.micro.srv.PostHouses", cli.Client())
+	rsp, err := exampleClient.PostHouses(context.TODO(), &POSTHOUSES.Request{
+		Sessionid: cookie.Value,
+		Data:      body,
+	})
+	//判断错误
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	//定义容器，接受返回的数据
+	data := make(map[string]interface{})
+	data["house_id"] = int(rsp.HouseId)
+
+	// we want to augment the response
+	response := map[string]interface{}{
+		"errno":  rsp.Errno,
+		"errmsg": rsp.Errmsg,
+		"data":   data,
+	}
+
+	//设置返回数据的格式
+	w.Header().Set("Content-type", "application/json")
+
+	// 将返回数据转化为json格式，传输给前端
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	return
+}
+
+//发送（上传）房屋图片服务
+func PostHousesImage(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	fmt.Println("上传房屋图片服务  PostHousesImage   /api/v1.0/houses/:id/images")
+
+	//获取前端发送的参数
+	houseid := ps.ByName("id")
+
+	//获取sessionid
+	cookie, err := r.Cookie("ihomelogin")
+	if err != nil {
+		fmt.Println("获取cookie错误")
+		// we want to augment the response
+		response := map[string]interface{}{
+			"errno":  utils.RECODE_SESSIONERR,
+			"errmsg": utils.RecodeText(utils.RECODE_SESSIONERR),
+		}
+		//设置返回数据的格式
+		w.Header().Set("Content-type", "application/json")
+		// encode and write the response as json
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		return
+	}
+
+	//获取前端发送的图片数据
+	file, head, err := r.FormFile("house_image")
+	if err != nil {
+		fmt.Println("获取图片数据错误")
+		// we want to augment the response
+		response := map[string]interface{}{
+			"errno":  utils.RECODE_IOERR,
+			"errmsg": utils.RecodeText(utils.RECODE_IOERR),
+		}
+		//设置返回数据的格式
+		w.Header().Set("Content-type", "application/json")
+		// encode and write the response as json
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		return
+	}
+
+	fmt.Println("===========================================")
+	fmt.Println("文件名：", head.Filename)
+	fmt.Println("文件大小：", head.Size)
+	fmt.Println("===========================================")
+
+	//定义容器储存图片数据
+	filebuffer := make([]byte, head.Size)
+	//将文件读取进入容器中
+	_, err = file.Read(filebuffer)
+	if err != nil {
+		fmt.Println("图片数据读取失败：", err)
+		// we want to augment the response
+		response := map[string]interface{}{
+			"errno":  utils.RECODE_IOERR,
+			"errmsg": utils.RecodeText(utils.RECODE_IOERR),
+		}
+		//设置返回数据的格式
+		w.Header().Set("Content-type", "application/json")
+		// encode and write the response as json
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		return
+	}
+
+	//创建grpc链接 客户端
+	cli := grpc.NewService()
+	//初始化
+	cli.Init()
+
+	// call the backend service
+	exampleClient := POSTHOUSESIMAGE.NewExampleService("go.micro.srv.PostHousesImage", cli.Client())
+	rsp, err := exampleClient.PostHousesImage(context.TODO(), &POSTHOUSESIMAGE.Request{
+		Sessionid: cookie.Value,
+		Image:     filebuffer,
+		HouseId:   houseid,
+		Filesize:  head.Size,
+		Filename:  head.Filename,
+	})
+	//判断错误
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	//定义返回数据容器
+	data := make(map[string]interface{})
+	data["url"] = utils.AddDomain2Url(rsp.Url)
+
+	//返回数据map
+	response := map[string]interface{}{
+		"errno":  rsp.Errno,
+		"errmsg": rsp.Errmsg,
+		"data":   data,
+	}
+
+	//设置返回数据的格式
+	w.Header().Set("Content-type", "application/json")
+	// encode and write the response as json
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	return
+}
+
+//获取房屋详细信息服务
+func GetHouseInfo(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	fmt.Println("获取房源详细信息 GetHouseInfo  api/v1.0/houses/:id ")
+
+	//获取房屋id
+	houseid := ps.ByName("id")
+
+	//获取sessionid
+	cookie, err := r.Cookie("ihomelogin")
+	if err != nil {
+		fmt.Println("获取sessionid错误")
+		// we want to augment the response
+		response := map[string]interface{}{
+			"errno":  utils.RECODE_SESSIONERR,
+			"errmsg": utils.RecodeText(utils.RECODE_SESSIONERR),
+		}
+		//设置返回数据的格式
+		w.Header().Set("Content-type", "application/json")
+		// encode and write the response as json
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		return
+	}
+
+	//创建grpc链接 客户端
+	cli := grpc.NewService()
+	//初始化
+	cli.Init()
+
+	// call the backend service
+	exampleClient := GETHOUSEINFO.NewExampleService("go.micro.srv.GetHouseInfo", cli.Client())
+	rsp, err := exampleClient.GetHouseInfo(context.TODO(), &GETHOUSEINFO.Request{
+		Sessionid: cookie.Value,
+		HouseId:   houseid,
+	})
+	//判断错误
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	//定义承载房屋信息的数据容器
+	house_data := make(map[string]interface{})
+	//将srv返回的数据解密装在容器中
+	if err := json.Unmarshal(rsp.Housedata, &house_data); err != nil {
+		fmt.Println("解密房屋数据失败")
+		// we want to augment the response
+		response := map[string]interface{}{
+			"errno":  utils.RECODE_IOERR,
+			"errmsg": utils.RecodeText(utils.RECODE_IOERR),
+		}
+		//设置返回数据的格式
+		w.Header().Set("Content-type", "application/json")
+		// encode and write the response as json
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		return
+	}
+
+	//定义返回前端的数据容器
+	data_map := make(map[string]interface{})
+	//房屋详细信息
+	data_map["house"] = house_data
+	//用户id
+	data_map["user_id"] = int(rsp.UserId)
+
+	// we want to augment the response
+	response := map[string]interface{}{
+		"errno":  rsp.Errno,
+		"errmsg": rsp.Errmsg,
+		"data":   data_map,
+	}
+
+	//设置返回数据的格式
+	w.Header().Set("Content-type", "application/json")
+	// encode and write the response as json
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	return
+}
+
+//获取（搜索）房源服务
+func GetHouses(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	fmt.Println("获取（搜索）房源服务  /api/v1.0/houses  GetHouses")
+
+	//获取url中的参数
+	aid := r.URL.Query()["aid"][0] //aid=5   地区编号
+	sd := r.URL.Query()["sd"][0]   //sd=2017-11-1   开始世界
+	ed := r.URL.Query()["ed"][0]   //ed=2017-11-3   结束世界
+	sk := r.URL.Query()["sk"][0]   //sk=new    第三栏条件
+	p := r.URL.Query()["p"][0]     //tp=1   页数
+
+	//创建grpc链接 客户端
+	cli := grpc.NewService()
+	//初始化
+	cli.Init()
+
+	// call the backend service
+	exampleClient := GETHOUSES.NewExampleService("go.micro.srv.GetHouses", cli.Client())
+	rsp, err := exampleClient.GetHouses(context.TODO(), &GETHOUSES.Request{
+		Aid: aid,
+		Sd:  sd,
+		Ed:  ed,
+		Sk:  sk,
+		P:   p,
+	})
+	//判断错误
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	//定义接受houses数据容器
+	houses := []interface{}{}
+	if err := json.Unmarshal(rsp.Houses, houses); err != nil {
+		fmt.Println("解码houses数据错误")
+		// we want to augment the response
+		response := map[string]interface{}{
+			"errno":  utils.RECODE_DATAERR,
+			"errmsg": utils.RecodeText(utils.RECODE_DATAERR),
+		}
+		//设置返回数据的格式
+		w.Header().Set("Content-type", "application/json")
+		// encode and write the response as json
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		return
+	}
+
+	//定义返回数据容器
+	data := make(map[string]interface{})
+	data["current_page"] = rsp.CurrentPage
+	data["houses"] = houses
+	data["total_page"] = rsp.TotalPage
+
+	// we want to augment the response
+	response := map[string]interface{}{
+		"errno":  rsp.Errno,
+		"errmsg": rsp.Errmsg,
+		"data":   data,
+	}
+
+	//设置返回数据的格式
+	w.Header().Set("Content-type", "application/json")
+	// encode and write the response as json
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	return
+}
+
+//-------------------------------未校验------------------------------------------------------------
+
+//发送（发布）订单服务
+func PostOrders(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	fmt.Println("发送（发布）订单服务	PostOrders	api/v1.0/orders	PostOrders")
+
+	//接收前段发送过来数据，转化为二进制
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		fmt.Println("接受前端数据错误，err：", err)
+		// we want to augment the response
+		response := map[string]interface{}{
+			"errno":  utils.RECODE_IOERR,
+			"errmsg": utils.RecodeText(utils.RECODE_IOERR),
+		}
+		//设置返回数据的格式
+		w.Header().Set("Content-type", "application/json")
+		// encode and write the response as json
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		return
+	}
+
+	//获取sessionid
+	cookie, err := r.Cookie("ihomelogin")
+	if err != nil {
+		fmt.Println("获取sessionid错误，err：", err)
+		// we want to augment the response
+		response := map[string]interface{}{
+			"errno":  utils.RECODE_SESSIONERR,
+			"errmsg": utils.RecodeText(utils.RECODE_SESSIONERR),
+		}
+		//设置返回数据的格式
+		w.Header().Set("Content-type", "application/json")
+		// encode and write the response as json
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		return
+	}
+
+	//创建grpc链接 客户端
+	cli := grpc.NewService()
+	//初始化
+	cli.Init()
+
+	// call the backend service
+	exampleClient := POSTORDERS.NewExampleService("go.micro.srv.PostOrders", cli.Client())
+	rsp, err := exampleClient.PostOrders(context.TODO(), &POSTORDERS.Request{
+		Sessionid: cookie.Value,
+		Body:      body,
+	})
+	//判断错误
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	//定义返回数据容器
+	houseid_map := make(map[string]interface{})
+	houseid_map["order_id"] = int(rsp.OrderId)
+
+	// 发送给前段的数据
+	response := map[string]interface{}{
+		"errno":  rsp.Errno,
+		"errmsg": rsp.Errmsg,
+		"data":   houseid_map,
+	}
+
+	//设置返回数据的格式
+	w.Header().Set("Content-type", "application/json")
+	// encode and write the response as json
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	return
+}
+
+//获取房东/租户订单信息服务
+func GetUserOrder(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	fmt.Println("获取房东/租户订单信息服务	GET	api/v1.0/user/orders	GetUserOrder")
+
+	//获取前端发送过来的数据 role{custom / landlord}
+	role := r.URL.Query()["role"][0]
+
+	//获取sessionid
+	cookie, err := r.Cookie("ihomelogin")
+	if err != nil {
+		fmt.Println("获取sessionid错误，err ：", err)
+		// we want to augment the response
+		response := map[string]interface{}{
+			"errno":  utils.RECODE_SESSIONERR,
+			"errmsg": utils.RecodeText(utils.RECODE_SESSIONERR),
+		}
+		//设置返回数据的格式
+		w.Header().Set("Content-type", "application/json")
+		// encode and write the response as json
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		return
+	}
+
+	//创建grpc链接 客户端
+	cli := grpc.NewService()
+	//初始化
+	cli.Init()
+
+	// call the backend service
+	exampleClient := GETUSERORDERS.NewExampleService("go.micro.srv.GetUserOrder", cli.Client())
+	rsp, err := exampleClient.GetUserOrder(context.TODO(), &GETUSERORDERS.Request{
+		Sessionid: cookie.Value,
+		Role:      role,
+	})
+	//判断错误
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	//定义返回前端数据容器
+	order_map := map[string]interface{}{}
+	orders := []interface{}{}
+
+	//将数据放进容器中
+	if err := json.Unmarshal(rsp.Data, &orders); err != nil {
+		fmt.Println("解码json数据错误,err ：", err)
+		// we want to augment the response
+		response := map[string]interface{}{
+			"errno":  utils.RECODE_DATAERR,
+			"errmsg": utils.RecodeText(utils.RECODE_DATAERR),
+		}
+		//设置返回数据的格式
+		w.Header().Set("Content-type", "application/json")
+		// encode and write the response as json
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		return
+	}
+
+	//将数据装进map中
+	order_map["orders"] = orders
+
+	// 返回前端数据
+	response := map[string]interface{}{
+		"errno":  rsp.Errno,
+		"errmsg": rsp.Errmsg,
+		"data":   order_map,
+	}
+
+	//设置返回数据的格式
+	w.Header().Set("Content-type", "application/json")
+	// encode and write the response as json
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	return
+}
+
+//更新房东同意/拒绝订单
+func PutOrders(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	fmt.Println("更新房东同意/拒绝订单	PUT	api/v1.0/orders/:id/status	PutOrders")
+
+	//接收请求携带的数据    将数据用json处理函数，转换为map格式数据
+	var request map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, err.Error(), 501)
+		return
+	}
+
+	//是否接受
+	action := request["action"].(string)
+
+	//获取前端数据（订单id）
+	orderid := ps.ByName("id")
+
+	//获取sessionid
+	cookie, err := r.Cookie("ihomelogin")
+	if err != nil {
+		fmt.Println("获取sessionid错误,err :", err)
+		// we want to augment the response
+		response := map[string]interface{}{
+			"errno":  utils.RECODE_SESSIONERR,
+			"errmsg": utils.RecodeText(utils.RECODE_SESSIONERR),
+		}
+
+		//设置返回数据的格式
+		w.Header().Set("Content-type", "application/json")
+		// encode and write the response as json
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		return
+	}
+
+	//创建grpc链接 客户端
+	cli := grpc.NewService()
+	//初始化
+	cli.Init()
+
+	// call the backend service
+	exampleClient := PUTORDERS.NewExampleService("go.micro.srv.PutOrders", cli.Client())
+	rsp, err := exampleClient.PutOrders(context.TODO(), &PUTORDERS.Request{
+		Sessionid: cookie.Value,
+		Action:    action,
+		Orderid:   orderid,
+	})
+	//判断错误
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	// we want to augment the response
+	response := map[string]interface{}{
+		"errno":  rsp.Errno,
+		"errmsg": rsp.Errmsg,
+	}
+
+	//设置返回数据的格式
+	w.Header().Set("Content-type", "application/json")
+	// encode and write the response as json
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	return
+}
+
+//更新用户评价订单信息
+func PutComment(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	fmt.Println("更新用户评价订单信息	PUT	api/v1.0/orders/:id/comment   	PutComment")
+
+	// 获取前端传来的参数，进行数据转换
+	var request map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	//获取订单编号
+	orderid := ps.ByName("id")
+
+	//获取sessionid
+	cookie, err := r.Cookie("ihomelogin")
+	if err != nil {
+		fmt.Println("获取sessionid错误,err :", err)
+		// we want to augment the response
+		response := map[string]interface{}{
+			"errno":  utils.RECODE_SESSIONERR,
+			"errmsg": utils.RecodeText(utils.RECODE_SESSIONERR),
+		}
+
+		//设置返回数据的格式
+		w.Header().Set("Content-type", "application/json")
+		// encode and write the response as json
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		return
+	}
+
+	//获取评论内容
+	comment := request["comment"].(string)
+
+	//创建grpc链接 客户端
+	cli := grpc.NewService()
+	//初始化
+	cli.Init()
+
+	// call the backend service
+	exampleClient := PUTCOMMENT.NewExampleService("go.micro.srv.PutComment", cli.Client())
+	rsp, err := exampleClient.PutComment(context.TODO(), &PUTCOMMENT.Request{
+		Sessionid: cookie.Value,
+		OrderId:   orderid,
+		Comment:   comment,
+	})
+	//判断错误
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	// 返回的数据map
+	response := map[string]interface{}{
+		"errno":  rsp.Errno,
+		"errmsg": rsp.Errmsg,
+	}
+
+	//设置返回数据的格式
+	w.Header().Set("Content-type", "application/json")
+	// encode and write the response as json
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	return
 }

@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package go.micro.srv.PostHousesImage;
+
+service Example {
+    rpc PostHousesImage (Request) returns (Response) {}
+}
+
+//web-->srv
+message Request {
+    //sessionid
+    string sessionid = 1;
+    //二进制图片
+    bytes Image = 2;
+    //房屋id
+    string house_id = 3;
+    //图片大小
+    int64 filesize = 4;
+    //图片名
+    string filename = 5;
+}
+
+//srv--web
+message Response {
+    //错误码
+    string errno = 1;
+    //错误信息
+    string errmsg = 2;
+    //房屋图片url，不完整，需要拼接
+    string url = 3;
+}
+
